@@ -1,1 +1,24 @@
 Our Finall Project:
+- What is the main idea of the web app?
+
+Our main idea is to have a website of two student AI helpers, 
+one of them helps mostly with studying and the other with homework (Maybe one for high school one for uni)
+
+- What responsibility does each agent have?
+
+one helps with academic tests and the other with homework and external curriculur stuff.
+
+- How does the user move through the application from beginning to end?
+
+1. Sign up / in
+2. A page to pick the starter agent
+3. A texting page of the agent and the user
+* Maybe a function of image genorator / useable camera for questions
+
+- What is the final product?
+
+A website which will help students with academic and educhational problems.
+
+#for us:
+The next milestone is about how the AI must have in their response a summery of the input and a main helpfull response.
+
