@@ -40,7 +40,7 @@ Your system prompt should answer the following statements:
 - WHAT it does (specific task)
 - WHAT IT WILL NOT DO (clear boundaries)
 
-> 💡 **Remember, Agents have a role and goal.**
+> 💡 **Remember, Agents have a role and a goal.**
 
 Update the system prompt so every response uses this exact format:
 
@@ -101,7 +101,7 @@ Steps:
 - Make sure both options actually work. Test picking Agent 1, then restart and test picking Agent 2. Each should complete its task and produce a result on its own.
 - Handle a bad input. If the user types something that isn't a valid option, the app should ask again instead of crashing.
 
-> 💡 Remember Test each agent through the menu one at a time. Confirm Agent 1 works through main.py before testing Agent 2.
+> 💡 **Remember Test each agent through the menu one at a time. Confirm Agent 1 works through main.py before testing Agent 2.**
 
 Your file structure should look like this:
 
@@ -126,13 +126,24 @@ Write one detailed prompt for Bolt that explains:
 - What your app does and the problem it solves
 - What each agent does (its specific job)
 - How you want the app to look and feel
-- That each agent needs its own tab, with a different chat page for each agent — it's important to mention this explicitly, otherwise Bolt may merge both agents into one chat.
+  -  a tab and chat page for each agent — it's important to mention this explicitly, otherwise Bolt may merge both agents into one chat.
 
 Since you already have 3 Python files (your agents), you can import your GitHub repository directly into Bolt. This lets Bolt read and use your existing backend code to build the app around it, instead of writing the backend from scratch.
 
 Copy this and include it in your prompts:
 
-"Update the Anthropic client initialization to read the base URL from the environment: `new Anthropic({ apiKey, baseURL: process.env.ANTHROPIC_BASE_URL })`. Then add `ANTHROPIC_API_KEY=your-key-here` and `ANTHROPIC_BASE_URL=your-base-url` to the environment variables."
+```
+"Update the Anthropic client initialization to read the base URL from the environment:
+`new Anthropic({ apiKey, baseURL: process.env.ANTHROPIC_BASE_URL })`. Then add `ANTHROPIC_API_KEY=your-key-here`
+and `ANTHROPIC_BASE_URL=your-base-url` to the environment variables."
+```
+
+- Next, in the Bolt editor, find the `.env` file or the environment variables section.
+- Then in Bolt's env panel, set both:
+  ```
+  ANTHROPIC_API_KEY=your-key-here
+  ANTHROPIC_BASE_URL=your-base-url
+  ```
 
 Describe how you imagine the app to look, and mention the specific features you want, for example:
 
@@ -141,8 +152,7 @@ Describe how you imagine the app to look, and mention the specific features you 
 - A send button
 - A chat bar
 
-> 💡 Remember
-> Remember what we talked about in our previous sessions about clarity, feedback, and focus? Make sure to keep those in mind when prompting!
+> 💡 **Remember what we talked about in our previous sessions about clarity, feedback, and focus? Make sure to keep those in mind when prompting!**
 
 ! []
 
