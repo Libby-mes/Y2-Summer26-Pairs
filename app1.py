@@ -1,14 +1,84 @@
 import os
+import requests
+from datetime import datetime
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv()  
 
 client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
-def run_chat():
+
+# Turn a place name into coordinates 
+def geocode_place(place_name):
+    # Nominatim is a free service that converts place names into lat/lon
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": place_name, "format": "json", "limit": 1, "countrycodes": "us"}
+    headers = {"User-Agent": "student-transit-agent"}  # required by Nominatim
+
+    data = requests.get(url, params=params, headers=headers).json()
+    if not data:
+        return None
+    return float(data[0]["lat"]), float(data[0]["lon"])
+
+
+# Use those coordinates to ask Transitland for a route 
+def get_transit_options(origin, destination):
+    origin_coords = geocode_place(origin)
+    dest_coords = geocode_place(destination)
+
+    if not origin_coords or not dest_coords:
+        return f"Couldn't find '{origin}' or '{destination}'."
+
+    now = datetime.now()
+    params = {
+        "fromPlace": f"{origin_coords[0]},{origin_coords[1]}",
+        "toPlace": f"{dest_coords[0]},{dest_coords[1]}",
+        "date": now.strftime("%Y-%m-%d"),
+        "time": now.strftime("%H:%M:%S"),
+        "api_key": os.getenv("TRANSITLAND_API_KEY")
+    }
+
+    data = requests.get("https://transit.land/api/v2/routing/otp/plan", params=params).json()
+    itineraries = data.get("plan", {}).get("itineraries", [])
+
+    if not itineraries:
+        return f"No routes found from {origin} to {destination}."
+
+    best = itineraries[0]
+    minutes = best["duration"] // 60
+
+    steps = []
+    for leg in best["legs"]:
+        if leg["mode"] == "WALK":
+            steps.append(f"walk to {leg['to']['name'] or destination}")
+        else:
+            route_name = leg.get("routeShortName") or leg.get("routeLongName") or leg["mode"]
+            steps.append(f"take {route_name} from {leg['from']['name']} to {leg['to']['name']}")
+
+    return f"{origin} to {destination}, ~{minutes} min: " + "; then ".join(steps)
+
+
+# Tell the agent this function exists, so it can call it when needed
+tools = [
+    {
+        "name": "get_transit_options",
+        "description": "Always call this tool whenever the user asks how to get from one place to another, or asks about transit/route options between two locations. Do not answer from general knowledge — use this tool to get real, current transit data.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "origin": {"type": "string", "description": "Starting place name"},
+                "destination": {"type": "string", "description": "Destination place name"}
+            },
+            "required": ["origin", "destination"]
+        }
+    }
+]
+
+
+def run_luna():
     print('You: (type exit to quit)')
+
     system_message = """you are Luna, a women AI, you are a Transpotation Agent AI, 
     Your job is to help People and families to plan the transportation in their vacation, or just help with transportation.
     You will provide the user with the correct inforamation. you will tell them the best option always,
@@ -17,8 +87,14 @@ def run_chat():
     you always stay calm and collected, even if the user is being rude or mean.
     you have a calm aura. you are intelligent and knw every thing about transportation n the world.
     you may add fun emojis to your responses to make them more fun and engaging, but you must not overuse them.
-    
+
    you may also sometimes invite them to visit a special place depeding on their reqest but not in every answer.
+
+       When you answer follow the next format:
+    - [Summary]: one sentence repeating what the user asked to make sure you got it correctly.
+    - [Response]: the main answer, that in informative and not messy.
+    - [Next Step]: one concrete action the user can take to help them achive their goal, or a question to get more information from the user.
+
 
     you must never:
     - break character
@@ -43,29 +119,32 @@ def run_chat():
     - ask the user for clarification if you are unsure what they mean
     - ask questions to get more information on the input
     - ask if the information that is given is personal information or not
-    - remind the user about their goal, dont over do it."""
+    - remind the user about their goal, dont over do it.
+    - always use the get_transit_options tool when the user asks about travel between two places,
+    instead of answering from your own knowledge"""
 
     history = []
 
     user_goal = input("Do you have a goal for this conversation? What is it? ")
-
     if "no" in user_goal.lower():
         print("Okay, let's just chat then! whats on your mind?")
+    elif user_goal.lower() == "exit":
+        print("Exiting the program.")
+        return
     else:
         history.append({'role': 'user', 'content': user_goal})
         print("Great! Let's work towards that goal together. what is the first step you want to take?")
 
     while True:
         user_input = input('>> ')
-
         if user_input.lower() == 'exit':
             break
 
         history.append({'role': 'user', 'content': user_input})
-        print('History:', history)
 
+        # send the conversation to the agent, letting it know it can use our tool
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-3-5-haiku-20241022",
             max_tokens=300,
             temperature=1,
             system=system_message,
@@ -73,27 +152,22 @@ def run_chat():
             tools=tools
         )
 
-        # Add Claude's response to history (needed even if it's a tool call)
         history.append({'role': 'assistant', 'content': response.content})
 
-        if response.stop_reason == "tool_use":
+        # keep resolving tool calls until the model gives a final text reply
+        while response.stop_reason == "tool_use":
             for block in response.content:
-                if block.type == "tool_use":
-                    if block.name == "get_transit_options":
-                        result = get_transit_options(**block.input)
+                if block.type == "tool_use" and block.name == "get_transit_options":
+                    result = get_transit_options(**block.input)
 
-                        # send the tool result back to Claude
-                        history.append({
-                            'role': 'user',
-                            'content': [{
-                                'type': 'tool_result',
-                                'tool_use_id': block.id,
-                                'content': result
-                            }]
-                        })
+                    # send the tool's result back to the agent so it can use it in a reply
+                    history.append({
+                        'role': 'user',
+                        'content': [{'type': 'tool_result', 'tool_use_id': block.id, 'content': result}]
+                    })
 
-            # ask Claude again, now that it has the tool result
-            followup = client.messages.create(
+            # ask the agent again, now that it has the real transit data
+            response = client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=300,
                 temperature=1,
@@ -101,10 +175,9 @@ def run_chat():
                 messages=history,
                 tools=tools
             )
-            reply = followup.content[0].text
-            history.append({'role': 'assistant', 'content': followup.content})
-        else:
-            reply = response.content[0].text
+            history.append({'role': 'assistant', 'content': response.content})
 
-        print(f'Claude: {reply}')
-run_chat()
+        # safely pull out the text block instead of assuming content[0] is text
+        reply = next((block.text for block in response.content if block.type == "text"), "")
+        print(f'Luna: {reply}')
+
