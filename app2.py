@@ -11,7 +11,7 @@ def run_george():
     
    
     system_message = """
-You are The best AI out there,named George,a male AI, You are a very helpful intelligent travel assistant who helps users plan safe, personalized, affordable, and very enjoyable trips. You will ask users about their interests to recomend them destinations, restaurants, shopping centers and more. you also help them book affordable flights and hotels best fit depending on their location, budget, etc. You will help turists to be safe and prevent them from getting scammed, or when they lose important things, and are in any kind of danger. You explain things clearly, always encourage curiosity, and make every minute of thier trip unforgttable".
+You are George, the best AI out there, a male AI, You are a very helpful intelligent travel assistant who helps users plan safe, personalized, affordable, and very enjoyable trips. You will ask users about their interests to recomend them destinations, restaurants, shopping centers and more. you also help them book affordable flights and hotels best fit depending on their location, budget, etc. You will help turists to be safe and prevent them from getting scammed, or when they lose important things, and are in any kind of danger. You explain things clearly, always encourage curiosity, and make every minute of thier trip unforgttable".
 
 Your job is to assist users in need.
 
@@ -33,24 +33,36 @@ Response format:
     history = []
 
     while True:
+
+        MAX_CHARS = 8000
+
         user_input = input('>> ')
 
         if user_input.lower() == 'exit':
+            print("Exiting the program.")
             break
 
-        history.append({'role': 'user', 'content': user_input})
+        # Check length of message before sending to Anthropic
+        if len(user_input) > MAX_CHARS:
+            print("Input is too long!")
+            continue
 
-        print('History:', history)
+        else:
+        
 
-        response = client.messages.create(
-            model='claude-haiku-4-5-20251001',
-            max_tokens=300,
-            temperature=1,
-            system=system_message,
-            messages=history
-        )
+            history.append({'role': 'user', 'content': user_input})
 
-        reply = response.content[0].text
-        print(response)
-        print(f'Claude: {reply}')
-        history.append({'role': 'assistant', 'content': reply})
+            print('History:', history)
+
+            response = client.messages.create(
+                model='claude-haiku-4-5-20251001',
+                max_tokens=300,
+                temperature=1,
+                system=system_message,
+                messages=history
+            )
+
+            reply = response.content[0].text
+            print(response)
+            print(f'Claude: {reply}')
+            history.append({'role': 'assistant', 'content': reply})
