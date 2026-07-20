@@ -136,48 +136,60 @@ def run_luna():
         print("Great! Let's work towards that goal together. what is the first step you want to take?")
 
     while True:
+
+        MAX_CHARS = 8000
+
         user_input = input('>> ')
+
         if user_input.lower() == 'exit':
+            print("Exiting the program.")
             break
 
-        history.append({'role': 'user', 'content': user_input})
+        # Check length of message before sending to Anthropic
+        if len(user_input) > MAX_CHARS:
+            print("Input is too long!")
+            continue
 
-        # send the conversation to the agent, letting it know it can use our tool
-        response = client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=300,
-            temperature=1,
-            system=system_message,
-            messages=history,
-            tools=tools
-        )
+        else:
+            
+            history.append({'role': 'user', 'content': user_input})
 
-        history.append({'role': 'assistant', 'content': response.content})
-
-        # keep resolving tool calls until the model gives a final text reply
-        while response.stop_reason == "tool_use":
-            for block in response.content:
-                if block.type == "tool_use" and block.name == "get_transit_options":
-                    result = get_transit_options(**block.input)
-
-                    # send the tool's result back to the agent so it can use it in a reply
-                    history.append({
-                        'role': 'user',
-                        'content': [{'type': 'tool_result', 'tool_use_id': block.id, 'content': result}]
-                    })
-
-            # ask the agent again, now that it has the real transit data
+            # send the conversation to the agent, letting it know it can use our tool
             response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-3-5-haiku-20241022",
                 max_tokens=300,
                 temperature=1,
                 system=system_message,
                 messages=history,
                 tools=tools
             )
+
             history.append({'role': 'assistant', 'content': response.content})
 
-        # safely pull out the text block instead of assuming content[0] is text
-        reply = next((block.text for block in response.content if block.type == "text"), "")
-        print(f'Luna: {reply}')
+            # keep resolving tool calls until the model gives a final text reply
+            while response.stop_reason == "tool_use":
+                for block in response.content:
+                    if block.type == "tool_use" and block.name == "get_transit_options":
+                        result = get_transit_options(**block.input)
+
+                        # send the tool's result back to the agent so it can use it in a reply
+                        history.append({
+                            'role': 'user',
+                            'content': [{'type': 'tool_result', 'tool_use_id': block.id, 'content': result}]
+                        })
+
+                # ask the agent again, now that it has the real transit data
+                response = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=300,
+                    temperature=1,
+                    system=system_message,
+                    messages=history,
+                    tools=tools
+                )
+                history.append({'role': 'assistant', 'content': response.content})
+
+            # safely pull out the text block instead of assuming content[0] is text
+            reply = next((block.text for block in response.content if block.type == "text"), "")
+            print(f'Luna: {reply}')
 
