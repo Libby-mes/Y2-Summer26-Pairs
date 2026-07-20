@@ -77,6 +77,10 @@ tools = [
 
 
 def run_luna():
+    print("=" * 50)
+    print("       🚌  Welcome to Luna, Your Transportation Agent  ✈️")
+    print("=" * 50)
+    print("Luna is here to help you plan your transportation needs for your trip.")
     print('You: (type exit to quit)')
 
     system_message = """you are Luna, a women AI, you are a Transpotation Agent AI, 
@@ -144,7 +148,10 @@ def run_luna():
         if user_input.lower() == 'exit':
             print("Exiting the program.")
             break
-
+        elif user_input.lower().startswith('switch to george'):
+            from app2 import run_george as george
+            return george()
+        
         # Check length of message before sending to Anthropic
         if len(user_input) > MAX_CHARS:
             print("Input is too long!")

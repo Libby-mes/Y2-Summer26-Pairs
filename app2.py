@@ -7,6 +7,9 @@ load_dotenv()
 client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
 def run_george():
+    print("=" * 50)
+    print("Welcome to george he will give you your recomendations!")
+    print("=" * 50)
     print('You: (type exit to quit)')
     
    
@@ -48,7 +51,10 @@ Response format:
         if user_input.lower() == 'exit':
             print("Exiting the program.")
             break
-
+        elif user_input.lower().startswith('switch to luna'):
+            from app1 import run_luna as luna
+            return luna()
+        
         # Check length of message before sending to Anthropic
         if len(user_input) > MAX_CHARS:
             print("Input is too long!")
