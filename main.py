@@ -1,9 +1,9 @@
 import os
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from app1 import run_luna as luna
+from app2 import run_george as george
 
-import app1 as luna
-import app2 as george   
 
 load_dotenv()
 client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
@@ -16,10 +16,10 @@ def choose_starting_agent():
         
         if choice.lower() == "luna":
             print(f"Great! You've chosen to start with {choice}.")
-            return luna.run_luna()
+            luna()
         elif choice.lower() == "george":
-            print(f"Great! You've chosen to start with {choice}.")
-            return george.run_george()
+            print("Great! You've chosen to start with {choice}.")
+            george()
         elif choice == "exit":
             print("Exiting the program.")
             break
