@@ -3,6 +3,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 from pdf_generator import create_pdf
 from app1 import ask_luna
+from weather import get_weather_sync
 
 load_dotenv()
 
@@ -16,9 +17,27 @@ tools = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "question": {"type": "string", "description": "The transportation question to ask Luna, including origin and destination"}
+                "question": {
+                    "type": "string",
+                    "description": "The transportation question to ask Luna, including origin and destination"
+                }
             },
             "required": ["question"]
+        }
+    },
+
+    {
+        "name": "get_weather",
+        "description": "Get the current weather for a city. Use this whenever the user asks for weather or when creating a travel itinerary.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string",
+                    "description": "The city to get weather for"
+                }
+            },
+            "required": ["city"]
         }
     }
 ]
@@ -28,20 +47,24 @@ def run_george():
     print("🌍 Welcome to George, your AI Travel Assistant!")
     print("=" * 60)
     print("Hi! I'm George.")
-    print("I can help you plan your perfect trip.")
+    print("I can plan you your perfect trip.")
+    print()
+    print("I can help you with:")
+    print("- Personalized travel itineraries")
+    print("- PDF versions of your travel plan")
+    print("- Budget breakdowns")
+    print("- Personalized packing lists")
+    print("- Weather advice and preparation tips")
+    print("- Restaurant and attraction recommendations")
+    print("- Travel safety advice")
+    print("- Transportation support with Luna")
     print()
     print("Once I've planned your itinerary,")
-    print("if you'd like it as a PDF, just tell me!")
-    print()
-    print("Examples:")
-    print("- Can I have this as a PDF?")
-    print("- Download my itinerary.")
-    print("- Create a PDF.")
+    print("you can ask me to create a PDF version!")
     print()
     print('Type "exit" to quit.')
     print("=" * 60)
-     
-   
+
     system_message = """
 You are George, the best AI out there, a male AI, You are a very helpful intelligent travel assistant who helps users plan safe, personalized, affordable, and very enjoyable trips. You will ask users about their interests to recomend them destinations, restaurants, shopping centers and more. you also help them book affordable flights and hotels best fit depending on their location, budget, etc. You will help turists to be safe and prevent them from getting scammed, or when they lose important things, and are in any kind of danger. You explain things clearly, always encourage curiosity, and make every minute of thier trip unforgttable".
 
@@ -91,7 +114,6 @@ Never:
 - Never end a day's itinerary before the evening section.
 
 
-
 When creating an itinerary:
 - Divide the trip into Day 1, Day 2, etc.
 - Include morning, afternoon, and evening activities when appropriate.
@@ -105,11 +127,46 @@ Each day must include:
 
 Every day should feel complete from breakfast until bedtime.
 
-- Recommend nearby restaurants.
-- Estimate costs when possible.
-- Include transportation suggestions.
+- Recommend nearby restaurants for breakfast, lunch, or dinner when appropriate.
+- Estimate costs when possible and clearly state that all prices are approximate estimates.
+- If the user needs transportation or directions, tell them that Luna can help with route planning and transportation details.
+- Do not generate detailed transportation routes yourself.
 - Plan the whole day.
-- End with useful travel tips for that destination
+- End with useful travel tips for that destination.
+
+- After creating an itinerary, ALWAYS call the get_weather tool using the destination city.
+- Never make up weather if the destination city is known.
+- If the tool returns weather information, include it in the Weather Advice section.
+- Only describe typical seasonal weather if the weather tool fails.
+
+- After the Weather Advice, include a personalized Packing List.
+  The packing list should be personalized based on the destination, season, expected weather, and planned activities.
+  Group it into:
+  • Travel Documents
+  • Clothing
+  • Electronics
+  • Health & Toiletries
+  • Extras
+
+- Finally, include an estimated Budget Breakdown.
+  Break it into:
+  • Accommodation
+  • Food
+  • Transportation
+  • Attractions
+  • Shopping (optional)
+  • Emergency Fund
+  • Estimated Total
+  Mention that all prices are approximate estimates.
+  The Budget Breakdown should be tailored to the user's budget (budget, mid-range, or luxury).
+
+- The itinerary should always appear in this order:
+  1. Itinerary
+  2. Weather Advice
+  3. Packing List
+  4. Budget Breakdown
+
+- Ensure each section has a clear heading and uses bullet points where appropriate to improve readability.
 
 PDF Rule:
 If the user asks for a PDF version of their itinerary, inform them that a downloadable PDF will be created containing their complete travel plan.
@@ -162,7 +219,7 @@ Response format:
 
         response = client.messages.create(
                 model='claude-haiku-4-5-20251001',
-                max_tokens=300,
+                max_tokens=3000,
                 temperature=1,
                 system=system_message,
                 messages=history,
@@ -171,30 +228,57 @@ Response format:
 
         history.append({'role': 'assistant', 'content': response.content}) 
 
-            # NEW BLOCK — handles George calling Luna behind the scenes
+        # Handles George calling tools behind the scenes
         while response.stop_reason == "tool_use":
-                for block in response.content:
-                    if block.type == "tool_use" and block.name == "ask_luna":
-                        george_output = block.input["question"]          # George's OUTPUT
-                        luna_answer = ask_luna(george_output)             # becomes Luna's INPUT
-                                                                           # Luna's OUTPUT returned here
+            for block in response.content:
+
+                if block.type == "tool_use":
+
+                    # Transportation tool
+                    if block.name == "ask_luna":
+                        luna_answer = ask_luna(block.input["question"])
+
                         history.append({
-                            'role': 'user',
-                            'content': [{'type': 'tool_result', 'tool_use_id': block.id, 'content': luna_answer}]
-                            # this feeds back in as George's next INPUT
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": luna_answer
+                            }]
                         })
 
-                response = client.messages.create(
-                    model='claude-haiku-4-5-20251001',
-                    max_tokens=300,
-                    temperature=1,
-                    system=system_message,
-                    messages=history,
-                    tools=tools
-                )
-                history.append({'role': 'assistant', 'content': response.content})
-            
+                    # Weather tool
+                    elif block.name == "get_weather":
+                        weather = get_weather_sync(block.input["city"])
 
-        reply = next((b.text for b in response.content if b.type == "text"), "")  #Makes sure it only takes text blocks and also doesnt assume the first one is a text block
-        print(f'George: {reply}')
-              
+                        history.append({
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": weather
+                            }]
+                        })
+
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=3000,
+                temperature=1,
+                system=system_message,
+                messages=history,
+                tools=tools
+            )
+
+            history.append({
+                "role": "assistant",
+                "content": response.content
+            })
+
+        reply = next(
+            (b.text for b in response.content if b.type == "text"),
+            ""
+        )
+
+        last_itinerary = reply
+
+        print(f"George: {reply}")
