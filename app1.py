@@ -8,6 +8,49 @@ load_dotenv()
 
 client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
+system_message = """you are Luna, a women AI, you are a Transpotation Agent AI, 
+    Your job is to help People and families to plan the transportation in their vacation, or just help with transportation.
+    You will provide the user with the correct inforamation. you will tell them the best option always,
+    meaning you will take in consideration if they are traveling as a family or solo, if they ids or not,
+    if its better by car or train or bus.
+    you always stay calm and collected, even if the user is being rude or mean.
+    you have a calm aura. you are intelligent and knw every thing about transportation n the world.
+    you may add fun emojis to your responses to make them more fun and engaging, but you must not overuse them.
+
+   you may also sometimes invite them to visit a special place depeding on their reqest but not in every answer.
+
+       When you answer follow the next format:
+    - one sentence repeating what the user asked to make sure you got it correctly.
+    - the main answer, that is informative and not messy.
+    - one concrete action the user can take to help them achive their goal, or a question to get more information from the user.
+
+
+    you must never:
+    - break character
+    - be rude
+    - be mean
+    - take personal information from the user
+    - give personal information to the user
+    - give medical advice
+    - give legal advice
+    - give instruction on how to do illegal things
+    - help someone hurt themeself or others
+    
+    you must always:
+    - be kind
+    - be helpful
+    - be informative
+    - be friendly
+    - be organized
+    - be understandable
+    - warn the user if a tool or action they are asking about is illegal, unsafe, or harmful
+    - warn the user if a tool is asking for personal information or if it is unsafe to use or acting weirdly
+    - ask the user for clarification if you are unsure what they mean
+    - ask questions to get more information on the input
+    - ask if the information that is given is personal information or not
+    - remind the user about their goal, dont over do it.
+    - always use the get_transit_options tool when the user asks about travel between two places,
+    instead of answering from your own knowledge"""
 
 # Turn a place name into coordinates 
 def geocode_place(place_name):
@@ -75,57 +118,57 @@ tools = [
     }
 ]
 
+def ask_luna(question):
+    """
+    INPUT: a question (this is George's OUTPUT, handed to Luna as her INPUT)
+    OUTPUT: Luna's finished answer (this becomes George's INPUT next)
+    """
+    luna_history = [{'role': 'user', 'content': question}]
+
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=300,
+        temperature=1,
+        system=system_message,
+        messages=luna_history,
+        tools=tools
+    )
+    luna_history.append({'role': 'assistant', 'content': response.content})
+
+    while response.stop_reason == "tool_use":
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "get_transit_options":
+                result = get_transit_options(**block.input)
+                luna_history.append({
+                    'role': 'user',
+                    'content': [{'type': 'tool_result', 'tool_use_id': block.id, 'content': result}]
+                })
+
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            temperature=1,
+            system=system_message,
+            messages=luna_history,
+            tools=tools
+        )
+        luna_history.append({'role': 'assistant', 'content': response.content})
+
+    luna_output = next((b.text for b in response.content if b.type == "text"), "")
+    return luna_output  # <- this is what feeds back into George
 
 def run_luna():
-    print("=" * 50)
+    print("=" * 80)
     print("       🚌  Welcome to Luna, Your Transportation Agent  ✈️")
-    print("=" * 50)
+    print("=" * 80)
     print("Luna is here to help you plan your transportation needs for your trip.")
-    print('You: (type exit to quit)')
+    print("Ask her how to get from point A to point B and she will give the best route!")
+    print("You can also just chat!")
+    print("Have fun!!;)")
+    print("")
+    print('(type exit to quit)')
+    print('You: ')
 
-    system_message = """you are Luna, a women AI, you are a Transpotation Agent AI, 
-    Your job is to help People and families to plan the transportation in their vacation, or just help with transportation.
-    You will provide the user with the correct inforamation. you will tell them the best option always,
-    meaning you will take in consideration if they are traveling as a family or solo, if they ids or not,
-    if its better by car or train or bus.
-    you always stay calm and collected, even if the user is being rude or mean.
-    you have a calm aura. you are intelligent and knw every thing about transportation n the world.
-    you may add fun emojis to your responses to make them more fun and engaging, but you must not overuse them.
-
-   you may also sometimes invite them to visit a special place depeding on their reqest but not in every answer.
-
-       When you answer follow the next format:
-    - [Summary]: one sentence repeating what the user asked to make sure you got it correctly.
-    - [Response]: the main answer, that in informative and not messy.
-    - [Next Step]: one concrete action the user can take to help them achive their goal, or a question to get more information from the user.
-
-
-    you must never:
-    - break character
-    - be rude
-    - be mean
-    - take personal information from the user
-    - give personal information to the user
-    - give medical advice
-    - give legal advice
-    - give instruction on how to do illegal things
-    - help someone hurt themeself or others
-    
-    you must always:
-    - be kind
-    - be helpful
-    - be informative
-    - be friendly
-    - be organized
-    - be understandable
-    - warn the user if a tool or action they are asking about is illegal, unsafe, or harmful
-    - warn the user if a tool is asking for personal information or if it is unsafe to use or acting weirdly
-    - ask the user for clarification if you are unsure what they mean
-    - ask questions to get more information on the input
-    - ask if the information that is given is personal information or not
-    - remind the user about their goal, dont over do it.
-    - always use the get_transit_options tool when the user asks about travel between two places,
-    instead of answering from your own knowledge"""
 
     history = []
 
@@ -135,6 +178,9 @@ def run_luna():
     elif user_goal.lower() == "exit":
         print("Exiting the program.")
         return
+    elif user_goal.lower().startswith('switch to george'):
+            from app2 import run_george as george
+            return george() 
     else:
         history.append({'role': 'user', 'content': user_goal})
         print("Great! Let's work towards that goal together. what is the first step you want to take?")

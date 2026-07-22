@@ -22,15 +22,16 @@ def print_intro():
 
 def print_menu():
     print("=" * 40)
-    print("   Welcome to the Travel Assistant")
+    print("  ✈️ Welcome to the Travel Assistant 🚌")
     print("=" * 40)
     print("  1. Luna   - Transportation planning")
     print("  2. George - Trip planning & booking")
     print("=" * 40)
+print_intro()
 
 def choose_starting_agent():
     while True:
-        print_intro()
+        
 
         # Move the input request inside the loop!
         choice = input("Choose an agent to start with (luna/george), Type 'exit' to quit: ").lower()

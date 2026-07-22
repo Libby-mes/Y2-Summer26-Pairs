@@ -2,10 +2,26 @@ import os
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from pdf_generator import create_pdf
+from app1 import ask_luna
 
 load_dotenv()
 
 client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+
+# NEW: give George a tool so his model can decide to call ask_luna
+tools = [
+    {
+        "name": "ask_luna",
+        "description": "Always call this whenever the user asks how to get from one place to another, or wants route/transit directions — no matter how well-known the route seems. Never answer from your own knowledge. Note: Luna can only look up routes within the United States; if she can't find a location, she'll say so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "The transportation question to ask Luna, including origin and destination"}
+            },
+            "required": ["question"]
+        }
+    }
+]
 
 def run_george():
     print("=" * 60)
@@ -57,6 +73,8 @@ Never:
 - Never provide unsafe or illegal travel advice.
 - Never be rude
 - Never be disrespectful
+- Luna can only provide routing information for locations within the United States. If Luna reports she couldn't find one or both locations, tell the user honestly that you don't have route information for that location,
+ and let them know you (and Luna) can currently only help with routes within the US.
 - Never expect for users to quickly understand 
 - Never ask too many questions 
 - Never make up hotels, flights, restaurants, or attractions.
@@ -141,21 +159,42 @@ Response format:
 
         print('History:', history)
 
+
         response = client.messages.create(
-            model='claude-haiku-4-5-20251001',
-            max_tokens=3000,
-            temperature=0.5,
-            system=system_message,
-            messages=history
-        )
+                model='claude-haiku-4-5-20251001',
+                max_tokens=300,
+                temperature=1,
+                system=system_message,
+                messages=history,
+                tools=tools
+            )
 
-        reply = response.content[0].text
+        history.append({'role': 'assistant', 'content': response.content}) 
 
-        if len(reply) > 500:
-            last_itinerary = reply
-            print("Itinerary saved!")
+            # NEW BLOCK — handles George calling Luna behind the scenes
+        while response.stop_reason == "tool_use":
+                for block in response.content:
+                    if block.type == "tool_use" and block.name == "ask_luna":
+                        george_output = block.input["question"]          # George's OUTPUT
+                        luna_answer = ask_luna(george_output)             # becomes Luna's INPUT
+                                                                           # Luna's OUTPUT returned here
+                        history.append({
+                            'role': 'user',
+                            'content': [{'type': 'tool_result', 'tool_use_id': block.id, 'content': luna_answer}]
+                            # this feeds back in as George's next INPUT
+                        })
 
-        #print(response)
-        print(f'Claude: {reply}')
+                response = client.messages.create(
+                    model='claude-haiku-4-5-20251001',
+                    max_tokens=300,
+                    temperature=1,
+                    system=system_message,
+                    messages=history,
+                    tools=tools
+                )
+                history.append({'role': 'assistant', 'content': response.content})
+            
 
-        history.append({'role': 'assistant', 'content': reply})
+        reply = next((b.text for b in response.content if b.type == "text"), "")  #Makes sure it only takes text blocks and also doesnt assume the first one is a text block
+        print(f'George: {reply}')
+              
