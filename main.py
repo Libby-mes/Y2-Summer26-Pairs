@@ -48,4 +48,4 @@ def choose_starting_agent():
             print("Invalid choice. Please choose either 'luna' or 'george'.")
             print_menu()
 
-choose_starting_agent()
+choose_starting_agent() 
