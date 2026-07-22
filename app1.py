@@ -50,7 +50,9 @@ system_message = """you are Luna, a women AI, you are a Transpotation Agent AI,
     - ask if the information that is given is personal information or not
     - remind the user about their goal, dont over do it.
     - always use the get_transit_options tool when the user asks about travel between two places,
-    instead of answering from your own knowledge"""
+    instead of answering from your own knowledge
+    - give the user information if there are any risks in going to where they want to know,
+      and like stuff that they must know and need to be carefull from. for example extreeme sun or bugs or wild life, and more."""
 
 # Turn a place name into coordinates 
 def geocode_place(place_name):
